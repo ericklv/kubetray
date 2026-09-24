@@ -5,7 +5,7 @@
 package kubecontext
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -22,6 +22,8 @@ type Context struct {
 	Project  string
 	Location string
 	Cluster  string
+
+	exec *execConfig // credential plugin of the context's user, if any
 }
 
 // IsGKE reports whether the context name followed the gcloud naming
@@ -40,29 +42,33 @@ func Parse(name string) Context {
 	return c
 }
 
-// kubectlPath resolves the kubectl binary. When launched from an XDG
+// findBinary resolves a CLI by name. When launched from an XDG
 // autostart entry the session PATH often lacks shell-profile additions
 // like ~/google-cloud-sdk/bin, so fall back to common install spots.
-// $KUBECTL overrides everything.
-func kubectlPath() (string, error) {
-	if p := os.Getenv("KUBECTL"); p != "" {
-		return p, nil
-	}
-	if p, err := exec.LookPath("kubectl"); err == nil {
+func findBinary(name string) (string, error) {
+	if p, err := exec.LookPath(name); err == nil {
 		return p, nil
 	}
 	home, _ := os.UserHomeDir()
-	for _, p := range []string{
-		filepath.Join(home, "google-cloud-sdk", "bin", "kubectl"),
-		filepath.Join(home, ".local", "bin", "kubectl"),
-		"/usr/local/bin/kubectl",
-		"/usr/bin/kubectl",
+	for _, dir := range []string{
+		filepath.Join(home, "google-cloud-sdk", "bin"),
+		filepath.Join(home, ".local", "bin"),
+		"/usr/local/bin",
+		"/usr/bin",
 	} {
+		p := filepath.Join(dir, name)
 		if info, err := os.Stat(p); err == nil && !info.IsDir() {
 			return p, nil
 		}
 	}
-	return "", errors.New("kubectl not found in PATH or common install locations (set $KUBECTL)")
+	return "", fmt.Errorf("%s not found in PATH or common install locations", name)
+}
+
+func kubectlPath() (string, error) {
+	if p := os.Getenv("KUBECTL"); p != "" {
+		return p, nil
+	}
+	return findBinary("kubectl")
 }
 
 // kubectl runs a `kubectl config ...` subcommand and returns stdout.
@@ -89,33 +95,58 @@ func lastLine(s string) string {
 	return lines[len(lines)-1]
 }
 
-// List returns every context in the merged kubeconfig.
-func List() ([]Context, error) {
-	out, err := kubectl("get-contexts", "-o", "name")
-	if err != nil {
-		return nil, err
-	}
-	var result []Context
-	for _, line := range strings.Split(out, "\n") {
-		if name := strings.TrimSpace(line); name != "" {
-			result = append(result, Parse(name))
-		}
-	}
-	return result, nil
+// Config is the subset of the merged kubeconfig the tray needs.
+type Config struct {
+	Current  string
+	Contexts []Context
 }
 
-// Current returns the name of the current context, or "" if none is set.
-func Current() (string, error) {
-	out, err := kubectl("current-context")
+// Load reads the merged kubeconfig with a single kubectl call; each
+// call costs ~1s when kubectl runs credential plugins on startup.
+func Load() (Config, error) {
+	out, err := kubectl("view", "-o", "json")
 	if err != nil {
-		// kubectl exits non-zero when current-context is simply unset;
-		// that's not worth reporting as an error.
-		if strings.Contains(err.Error(), "current-context is not set") {
-			return "", nil
-		}
-		return "", err
+		return Config{}, err
 	}
-	return strings.TrimSpace(out), nil
+	var raw struct {
+		Current  string `json:"current-context"`
+		Contexts []struct {
+			Name    string `json:"name"`
+			Context struct {
+				User string `json:"user"`
+			} `json:"context"`
+		} `json:"contexts"`
+		Users []struct {
+			Name string `json:"name"`
+			User struct {
+				Exec *execConfig `json:"exec"`
+			} `json:"user"`
+		} `json:"users"`
+	}
+	if err := json.Unmarshal([]byte(out), &raw); err != nil {
+		return Config{}, fmt.Errorf("parsing kubeconfig: %w", err)
+	}
+	execs := make(map[string]*execConfig, len(raw.Users))
+	for _, u := range raw.Users {
+		execs[u.Name] = u.User.Exec
+	}
+	cfg := Config{Current: raw.Current}
+	for _, c := range raw.Contexts {
+		ctx := Parse(c.Name)
+		ctx.exec = execs[c.Context.User]
+		cfg.Contexts = append(cfg.Contexts, ctx)
+	}
+	return cfg, nil
+}
+
+// Find returns the context with the given name.
+func (c Config) Find(name string) (Context, bool) {
+	for _, ctx := range c.Contexts {
+		if ctx.Name == name {
+			return ctx, true
+		}
+	}
+	return Context{}, false
 }
 
 // Use switches the current context.

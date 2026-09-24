@@ -28,6 +28,8 @@ const (
 	menuObjectPath = dbus.ObjectPath("/MenuBar")
 	appID          = "gke-context-switcher"
 	watchInterval  = 2 * time.Second
+	// Sessions expire without touching kubeconfig, so recheck periodically.
+	sessionInterval = time.Minute
 )
 
 // prodPattern matches context names that look like production, which
@@ -54,19 +56,21 @@ func main() {
 		log.Fatalf("exporting tray item: %v", err)
 	}
 
-	// refresh runs from D-Bus callbacks and from the kubeconfig watcher
-	// goroutine; serialize it so entryToContext and the menu stay in sync.
-	var mu sync.Mutex
+	// State is shared by D-Bus callbacks, the watcher and the session
+	// ticker. render only reads it, so it never waits on external processes.
+	var (
+		mu               sync.Mutex
+		cfg              kubecontext.Config
+		loadErr          error
+		warning          string
+		entryToContext   map[int32]string // dbusmenu ids are int32, contexts are keyed by name
+		autostartEntryID int32
+		quitEntryID      int32
+		lastCurrent      = "\x00" // never a valid context name, forces the first status update
+	)
 
-	// entryToContext maps menu entry id -> context name, since dbusmenu
-	// ids must be int32 but contexts are keyed by name.
-	var entryToContext map[int32]string
-	var autostartEntryID int32
-
-	refresh := func() {
-		mu.Lock()
-		defer mu.Unlock()
-
+	// render rebuilds the menu from state; callers must hold mu.
+	render := func() {
 		entryToContext = make(map[int32]string)
 		var entries []tray.MenuEntry
 		nextID := int32(1) // 0 is reserved for the layout root
@@ -77,28 +81,26 @@ func main() {
 			return e.ID
 		}
 
-		current, err := kubecontext.Current()
-		if err != nil {
-			log.Printf("reading current context: %v", err)
-		}
-
-		contexts, err := kubecontext.List()
 		switch {
-		case err != nil:
-			log.Printf("listing contexts: %v", err)
+		case loadErr != nil:
 			add(tray.MenuEntry{Header: true, Label: "Could not read kubeconfig (see logs)"})
-		case len(contexts) == 0:
+		case len(cfg.Contexts) == 0:
 			add(tray.MenuEntry{Header: true, Label: "No contexts in kubeconfig"})
 		default:
-			for _, group := range groupByProject(contexts) {
+			for _, group := range groupByProject(cfg.Contexts) {
 				if group.title != "" {
 					add(tray.MenuEntry{Header: true, Label: group.title})
 				}
 				for _, c := range group.contexts {
-					id := add(tray.MenuEntry{Label: menuLabel(c), Checked: c.Name == current})
+					id := add(tray.MenuEntry{Label: menuLabel(c), Checked: c.Name == cfg.Current})
 					entryToContext[id] = c.Name
 				}
 			}
+		}
+
+		if warning != "" {
+			add(tray.MenuEntry{Separator: true})
+			add(tray.MenuEntry{Label: warning, ToggleType: "none"})
 		}
 
 		add(tray.MenuEntry{Separator: true})
@@ -108,29 +110,66 @@ func main() {
 			ToggleType: "checkmark",
 			Checked:    autostartEnabled,
 		})
+		quitEntryID = add(tray.MenuEntry{Label: "Quit", ToggleType: "none"})
 
 		menu.SetEntries(entries)
 
-		pixmaps := regularIcon
-		if prodPattern.MatchString(current) {
-			pixmaps = prodIcon
+		if current := cfg.Current; current != lastCurrent {
+			pixmaps := regularIcon
+			if prodPattern.MatchString(current) {
+				pixmaps = prodIcon
+			}
+			item.SetStatus(statusTitle(current), current, pixmaps)
+			lastCurrent = current
 		}
-		item.SetStatus(statusTitle(current), current, pixmaps)
+	}
+
+	checkSession := func() {
+		mu.Lock()
+		current, _ := cfg.Find(cfg.Current)
+		mu.Unlock()
+
+		w := kubecontext.SessionWarning(current)
+
+		mu.Lock()
+		defer mu.Unlock()
+		// Drop the result if the context changed mid-check; that change
+		// triggers its own check.
+		if cfg.Current == current.Name {
+			warning = w
+			render()
+		}
+	}
+
+	reload := func() {
+		c, err := kubecontext.Load()
+		if err != nil {
+			log.Printf("reading kubeconfig: %v", err)
+		}
+		mu.Lock()
+		cfg, loadErr = c, err
+		render()
+		mu.Unlock()
+		checkSession()
 	}
 
 	menu.OnSelect = func(entryID int32) {
 		mu.Lock()
-		name, isContext := entryToContext[entryID]
-		isAutostart := entryID == autostartEntryID
-		mu.Unlock()
+		defer mu.Unlock()
 
+		name, isContext := entryToContext[entryID]
 		switch {
 		case isContext:
-			if err := kubecontext.Use(name); err != nil {
-				log.Printf("switching to context %s: %v", name, err)
-				return
-			}
-		case isAutostart:
+			// Move the radio mark right away; kubectl takes ~1s.
+			cfg.Current = name
+			render()
+			go func() {
+				if err := kubecontext.Use(name); err != nil {
+					log.Printf("switching to context %s: %v", name, err)
+				}
+				reload()
+			}()
+		case entryID == autostartEntryID:
 			if enabled, _ := autostart.IsEnabled(); enabled {
 				if err := autostart.Disable(); err != nil {
 					log.Printf("disabling autostart: %v", err)
@@ -140,14 +179,20 @@ func main() {
 					log.Printf("enabling autostart: %v", err)
 				}
 			}
-		default:
-			return
+			render()
+		case entryID == quitEntryID:
+			// Dropping the bus connection makes the watcher remove the icon.
+			os.Exit(0)
 		}
-		refresh()
 	}
 
-	refresh()
-	go kubecontext.Watch(watchInterval, refresh)
+	reload()
+	go kubecontext.Watch(watchInterval, reload)
+	go func() {
+		for range time.Tick(sessionInterval) {
+			checkSession()
+		}
+	}()
 
 	fmt.Fprintln(os.Stderr, "gke-context-switcher running; waiting for tray host to display the icon")
 	select {} // block forever; all work happens in D-Bus callbacks and the watcher

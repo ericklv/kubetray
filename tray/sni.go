@@ -8,6 +8,7 @@ package tray
 import (
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -29,6 +30,17 @@ type Pixmap struct {
 	Width  int32
 	Height int32
 	Data   []byte
+}
+
+// clonePixmaps deep-copies pixmaps before handing them to prop, whose
+// Set stores new values *into* the previous one's backing arrays; passing
+// shared slices would overwrite the caller's cached icons.
+func clonePixmaps(pixmaps []Pixmap) []Pixmap {
+	out := make([]Pixmap, len(pixmaps))
+	for i, p := range pixmaps {
+		out[i] = Pixmap{Width: p.Width, Height: p.Height, Data: slices.Clone(p.Data)}
+	}
+	return out
 }
 
 // toolTip mirrors the SNI ToolTip property, (sa(iiay)ss): icon name,
@@ -63,7 +75,7 @@ func NewItem(conn *dbus.Conn, id, title string, pixmaps []Pixmap, menu *Menu) (*
 			"Title":      {Value: title, Writable: false, Emit: prop.EmitTrue},
 			"Status":     {Value: "Active", Writable: false, Emit: prop.EmitTrue},
 			"IconName":   {Value: "", Writable: false, Emit: prop.EmitTrue},
-			"IconPixmap": {Value: pixmaps, Writable: false, Emit: prop.EmitTrue},
+			"IconPixmap": {Value: clonePixmaps(pixmaps), Writable: false, Emit: prop.EmitTrue},
 			"ToolTip":    {Value: toolTip{Title: title, IconPixmaps: []Pixmap{}}, Writable: false, Emit: prop.EmitTrue},
 			"ItemIsMenu": {Value: true, Writable: false, Emit: prop.EmitTrue},
 			"Menu":       {Value: menu.ObjectPath(), Writable: false, Emit: prop.EmitTrue},
@@ -121,7 +133,7 @@ func NewItem(conn *dbus.Conn, id, title string, pixmaps []Pixmap, menu *Menu) (*
 // after its dedicated New* signal, so each change emits one.
 func (it *Item) SetStatus(title, description string, pixmaps []Pixmap) {
 	it.props.SetMust(sniInterface, "Title", title)
-	it.props.SetMust(sniInterface, "IconPixmap", pixmaps)
+	it.props.SetMust(sniInterface, "IconPixmap", clonePixmaps(pixmaps))
 	it.props.SetMust(sniInterface, "ToolTip", toolTip{
 		IconPixmaps: []Pixmap{},
 		Title:       title,
