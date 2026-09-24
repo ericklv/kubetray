@@ -1,0 +1,38 @@
+# Binaries
+/gke-context-switcher
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries and coverage
+*.test
+*.out
+coverage.txt
+
+# Go build/vendor artifacts
+vendor/
+/bin/
+/dist/
+
+# go.work files (local multi-module setups)
+go.work
+go.work.sum
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.iml
+.zed/
+*.code-workspace
+.nvim.lua
+.nvimrc
+.exrc
+*.swp
+*.swo
+*~
+
+# OS cruft
+.DS_Store
+Thumbs.db
