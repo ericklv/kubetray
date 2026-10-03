@@ -1,5 +1,5 @@
-// Package autostart manages the XDG autostart entry for k8s-context-switcher.
-// It writes ~/.config/autostart/k8s-context-switcher.desktop so the tray applet
+// Package autostart manages the XDG autostart entry for kubetray.
+// It writes ~/.config/autostart/kubetray.desktop so the tray applet
 // launches automatically on login on any XDG-compliant desktop.
 package autostart
 
@@ -12,7 +12,7 @@ import (
 
 const desktopEntry = `[Desktop Entry]
 Type=Application
-Name=K8s Context Switcher
+Name=KubeTray
 Comment=Tray applet to switch the current Kubernetes context
 Exec=%s
 Icon=utilities-terminal
@@ -31,7 +31,7 @@ func entryPath() (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "k8s-context-switcher.desktop"), nil
+	return filepath.Join(dir, "kubetray.desktop"), nil
 }
 
 // IsEnabled reports whether the autostart .desktop file is present.

@@ -1,5 +1,5 @@
 # Binaries
-/k8s-context-switcher
+/kubetray
 *.exe
 *.exe~
 *.dll

@@ -1,4 +1,4 @@
-# K8s Context Switcher & Sync
+# KubeTray & Sync
 
 Script en Bash para sincronizar automáticamente los contextos de clusters **Google Kubernetes Engine (GKE)** de todos los proyectos de tu organización o cuenta de Google Cloud Platform (GCP) en tu archivo local `kubeconfig`.
 
@@ -66,7 +66,7 @@ Script en Bash para sincronizar automáticamente los contextos de clusters **Goo
 
 ---
 
-## 🖱️ App de bandeja: `k8s-context-switcher`
+## 🖱️ App de bandeja: `kubetray`
 
 Icono de bandeja para cambiar el contexto actual de kubeconfig, hecho
 igual que `browser-switcher`: sin GTK, el icono y el menú hablan
@@ -92,7 +92,7 @@ en tiempo de ejecución son D-Bus y `kubectl`.
   AWS: `aws sts get-caller-identity` con el perfil del plugin; Azure:
   `az account get-access-token`, solo en el modo `azurecli` de kubelogin).
   Se vuelve a comprobar cada minuto.
-- "Launch at login" activa/desactiva `~/.config/autostart/k8s-context-switcher.desktop`.
+- "Launch at login" activa/desactiva `~/.config/autostart/kubetray.desktop`.
 
 `kubectl` se busca en el `PATH`, y si no está, en `~/google-cloud-sdk/bin`,
 `~/.local/bin`, `/usr/local/bin` y `/usr/bin` (las sesiones de autostart
@@ -102,7 +102,7 @@ Necesita un StatusNotifierHost para mostrar el icono, p. ej. el módulo
 `tray` de waybar, o `snixembed` si tu barra no soporta StatusNotifierItem.
 
 ```bash
-make build                # genera ./k8s-context-switcher
+make build                # genera ./kubetray
 sudo make install         # instala en /usr/local/bin (PREFIX=/usr para cambiarlo)
 sudo make uninstall
 ```

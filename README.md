@@ -1,4 +1,4 @@
-# K8s Context Switcher & Sync
+# KubeTray & Sync
 
 Bash script to automatically scan all Google Cloud Platform (GCP) projects across your organization or account, discover **Google Kubernetes Engine (GKE)** clusters, and register their credentials into your local `kubeconfig` while preventing duplicate entries.
 
@@ -70,7 +70,7 @@ Bash script to automatically scan all Google Cloud Platform (GCP) projects acros
 
 ---
 
-## 🖱️ Tray app: `k8s-context-switcher`
+## 🖱️ Tray app: `kubetray`
 
 Tray icon to switch the current kubeconfig context, built the same way
 as `browser-switcher`: no GTK, the icon and menu talk directly to the
@@ -95,7 +95,7 @@ interfaces, so the only runtime dependencies are D-Bus and `kubectl`.
   get-caller-identity` with the plugin's profile; Azure: `az account
   get-access-token`, only for kubelogin's `azurecli` mode). Rechecked
   every minute.
-- "Launch at login" toggles `~/.config/autostart/k8s-context-switcher.desktop`.
+- "Launch at login" toggles `~/.config/autostart/kubetray.desktop`.
 
 `kubectl` is looked up in `PATH`, then in `~/google-cloud-sdk/bin`,
 `~/.local/bin`, `/usr/local/bin` and `/usr/bin` (autostart sessions
@@ -106,7 +106,7 @@ Requires a StatusNotifierHost to display the icon, e.g. waybar's
 StatusNotifierItem.
 
 ```bash
-make build                # builds ./k8s-context-switcher
+make build                # builds ./kubetray
 sudo make install         # installs to /usr/local/bin (PREFIX=/usr to change)
 sudo make uninstall
 ```

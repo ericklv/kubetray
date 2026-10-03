@@ -1,4 +1,4 @@
-// Command k8s-context-switcher is a tray icon that lets you pick the
+// Command kubetray is a tray icon that lets you pick the
 // current kubeconfig context, built without any GTK dependency: the
 // tray icon and menu are implemented directly against the freedesktop
 // StatusNotifierItem / com.canonical.dbusmenu D-Bus specs.
@@ -18,15 +18,15 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"k8s-context-switcher/autostart"
-	"k8s-context-switcher/icon"
-	"k8s-context-switcher/kubecontext"
-	"k8s-context-switcher/tray"
+	"kubetray/autostart"
+	"kubetray/icon"
+	"kubetray/kubecontext"
+	"kubetray/tray"
 )
 
 const (
 	menuObjectPath = dbus.ObjectPath("/MenuBar")
-	appID          = "k8s-context-switcher"
+	appID          = "kubetray"
 	watchInterval  = 2 * time.Second
 	// Sessions expire without touching kubeconfig, so recheck periodically.
 	sessionInterval = time.Minute
@@ -194,7 +194,7 @@ func main() {
 		}
 	}()
 
-	fmt.Fprintln(os.Stderr, "k8s-context-switcher running; waiting for tray host to display the icon")
+	fmt.Fprintln(os.Stderr, "kubetray running; waiting for tray host to display the icon")
 	select {} // block forever; all work happens in D-Bus callbacks and the watcher
 }
 

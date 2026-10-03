@@ -1,4 +1,4 @@
-module k8s-context-switcher
+module kubetray
 
 go 1.22
 

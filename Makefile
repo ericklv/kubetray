@@ -1,4 +1,4 @@
-BINARY := k8s-context-switcher
+BINARY := kubetray
 PREFIX ?= /usr/local
 BINDIR := $(DESTDIR)$(PREFIX)/bin
 
