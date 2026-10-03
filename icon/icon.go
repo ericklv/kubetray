@@ -7,7 +7,7 @@ package icon
 import (
 	"math"
 
-	"gke-context-switcher/tray"
+	"k8s-context-switcher/tray"
 )
 
 // Color is an opaque RGB color for the heptagon background.

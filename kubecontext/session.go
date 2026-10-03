@@ -81,7 +81,8 @@ func SessionWarning(c Context) string {
 		cmd.Env = append(cmd.Env, e.Name+"="+e.Value)
 	}
 	if cmd.Run() != nil {
-		return "⚠ No active " + provider + " session — run: " + fix
+		return "⚠ No active " + provider + " session run:\n > " + fix
+
 	}
 	return ""
 }

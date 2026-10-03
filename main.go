@@ -1,4 +1,4 @@
-// Command gke-context-switcher is a tray icon that lets you pick the
+// Command k8s-context-switcher is a tray icon that lets you pick the
 // current kubeconfig context, built without any GTK dependency: the
 // tray icon and menu are implemented directly against the freedesktop
 // StatusNotifierItem / com.canonical.dbusmenu D-Bus specs.
@@ -18,15 +18,15 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"gke-context-switcher/autostart"
-	"gke-context-switcher/icon"
-	"gke-context-switcher/kubecontext"
-	"gke-context-switcher/tray"
+	"k8s-context-switcher/autostart"
+	"k8s-context-switcher/icon"
+	"k8s-context-switcher/kubecontext"
+	"k8s-context-switcher/tray"
 )
 
 const (
 	menuObjectPath = dbus.ObjectPath("/MenuBar")
-	appID          = "gke-context-switcher"
+	appID          = "k8s-context-switcher"
 	watchInterval  = 2 * time.Second
 	// Sessions expire without touching kubeconfig, so recheck periodically.
 	sessionInterval = time.Minute
@@ -194,7 +194,7 @@ func main() {
 		}
 	}()
 
-	fmt.Fprintln(os.Stderr, "gke-context-switcher running; waiting for tray host to display the icon")
+	fmt.Fprintln(os.Stderr, "k8s-context-switcher running; waiting for tray host to display the icon")
 	select {} // block forever; all work happens in D-Bus callbacks and the watcher
 }
 
@@ -257,10 +257,10 @@ func menuLabel(c kubecontext.Context) string {
 // statusTitle is the tray title/tooltip headline for the current context.
 func statusTitle(current string) string {
 	if current == "" {
-		return "Kubernetes: no context"
+		return "K8s: no context"
 	}
 	if c := kubecontext.Parse(current); c.IsGKE() {
-		return "Kubernetes: " + c.Cluster + " (" + c.Project + ")"
+		return "K8s: " + c.Cluster + " (" + c.Project + ")"
 	}
-	return "Kubernetes: " + current
+	return "K8s: " + current
 }

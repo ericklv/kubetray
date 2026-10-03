@@ -1,5 +1,5 @@
 # Binaries
-/gke-context-switcher
+/k8s-context-switcher
 *.exe
 *.exe~
 *.dll

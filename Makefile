@@ -1,4 +1,4 @@
-BINARY := gke-context-switcher
+BINARY := k8s-context-switcher
 PREFIX ?= /usr/local
 BINDIR := $(DESTDIR)$(PREFIX)/bin
 

@@ -1,4 +1,4 @@
-module gke-context-switcher
+module k8s-context-switcher
 
 go 1.22
 
